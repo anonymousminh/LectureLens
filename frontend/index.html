@@ -7,11 +7,20 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Welcome to LectureLens - your AI application note for your lecture materials</h1>
+    <div id="app">
+        <h1>LectureLens Study Assistant</h1>
 
-    <div id="chat-window">
-        <div id="messageSystem"">Please upload your materials to begin</div>
+        <div id="chat-window">
+            <div id="message system">Welcome! Please upload your materials to begin</div>
+        </div>
+
+        <div id="input-area">
+            <input type="file" id="lecture-upload">
+            <input type="text" id="chat-input" placeholder="Ask a question...">
+            <button id="sendBtn" disabled>Send</button>
+        </div>
     </div>
     
+    <script src="script.js"></script>
 </body>
 </html>
