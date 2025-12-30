@@ -2,6 +2,16 @@ interface ChatRequest {
   message: string;
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+interface ChatHistory {
+  messages: ChatMessage[];
+}
+
 export class LectureMemory {
   state: DurableObjectState;
   env: any;
@@ -20,12 +30,39 @@ export class LectureMemory {
       try {
         const { message } = (await request.json()) as ChatRequest;
 
+        // Define the storage key for the chat history
+        const HISTORY_KEY = "chat_history";
+
+        // Retrieve the existing history (or initialize if there is not)
+        let history = (await this.state.storage.get<ChatHistory>(HISTORY_KEY)) || {messages: []};
+
+        // Append the new user message
+        const userMessage: ChatMessage = {
+          role: 'user',
+          content: message,
+          timestamp: Date.now()
+        };
+
+        // Add the user message to the history
+        history.messages.push(userMessage);
+
+        // Save the updated history back to storage
+        await this.state.storage.put(HISTORY_KEY, history);
+
+        // return new Response(JSON.stringify({
+        //   response: `Received message: "${message}". Ready for memory implementation.`,
+        //   doId: this.state.id.toString()
+        // }), {
+        //   headers: { 'Content-Type': 'application/json' },
+        // });
+
         return new Response(JSON.stringify({
-          response: `Received message: "${message}". Ready for memory implementation.`,
+          response: "User message saved to history.",
+          history: history.messages,
           doId: this.state.id.toString()
         }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
+          headers: {'Content-Type': 'application/json'}
+        })
       } catch (error) {
         console.error('Error processing chat request:', error);
         const errorMessage = error instanceof Error ? error.message : String(error);
