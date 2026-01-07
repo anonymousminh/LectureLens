@@ -6,6 +6,62 @@ let currentLectureId = 'lecture-12345';
 chatInput = document.getElementById("chat-input");
 sendButton = document.getElementById("send-button");
 chatWindow = document.getElementById("chat-window");
+const lectureUploadInput = document.getElementById("lecture-upload");
+
+// Handle File Upload Function
+async function handleFileUpload(){
+    // Check if the file has been uploaded
+    if (lectureUploadInput.files.length === 0){
+        displayMessage("Please upload a lecture file to begin", 'system');
+        return;
+    }
+
+    // Get the file
+    const file = lectureUploadInput.files[0];
+
+    // Display the loading message
+    const uploadMessage = displayMessage(`Uploading and processing "${file.name}"...`, 'system');
+
+    // Disable the upload input
+    lectureUploadInput.disabled = true;
+    chatInput.disabled = true;
+    sendButton.disabled = true;
+
+    try {
+        // Use FileReader to read the file content as text
+        const reader = new FileReader();
+
+        // This promise will resolve when the file is read
+        const fileContent = await new Promise((resolve, reject) => {
+            reader.onload = (event) => {
+                resolve(event.target.result); // File content
+            };
+            reader.onerror = (error) => {
+                reject(error); // File reading error
+            };
+            reader.readAsText(file); // Read the file
+        });
+
+        // Log for verification
+        console.log(`Received file: ${file.name}. Content preview: ${fileContent.substring(0, 100)}...`);
+
+        // Simulate the success and re-enable the UI
+        uploadMessage.textContent = `File ${file.name} uploaded successfully`;
+    } catch (error){
+        console.log("File Upload Error:", error);
+        uploadMessage.textContent = `Error: ${error.message}. Please try again.`;
+    } finally {
+        // Re-enable the UI
+        lectureUploadInput.disabled = false;
+    }
+}
+
+// Handle File Upload Button Click
+lectureUploadInput.addEventListener('change', handleFileUpload);
+
+// Initial UI state
+chatInput.disabled = true;
+sendButton.disabled = true;
 
 
 // Message Display Function
