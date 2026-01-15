@@ -58,7 +58,7 @@ export class LectureMemory {
         const lectureContent = await this.state.storage.get<string>(LECTURE_KEY);
 
         // 7. Construct the AI prompt that includes the lecture context
-        let systemPrompt = "You are LectureLens, an AI-powered study assistant. Your goal is to answer questions based on the provided lecture content and conversation history. Respond concisely and helpfully.";
+        let systemPrompt = "You are LectureLens, an AI-powered study assistant. Your goal is to answer questions based on the provided lecture content to answer the user's question. If the user's question is not related to the lecture content, you should say that you don't know.";
         
         // If lecture content exists, add it to the system prompt
         if (lectureContent) {
@@ -78,7 +78,7 @@ export class LectureMemory {
         ]
 
         // 10. Call the Workers AI binding
-        const model = '@cf/meta/llama-3-8b-instruct';
+        const model = '@cf/meta/llama-3.3-70b-instruct-awq';
         const aiResponse = await this.env.AI.run(model, {messages});
 
         const assistantResponse = aiResponse.response;
