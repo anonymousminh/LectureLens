@@ -54,5 +54,12 @@
 				"LectureMemory"
 			]
 		}
+	],
+	"d1_databases": [
+		{
+			"binding": "lecturelens_db",
+			"database_name": "lecturelens_db",
+			"database_id": "f8f4ca13-2bbe-4e3b-9606-8c7b5143405f"
+		}
 	]
 }
