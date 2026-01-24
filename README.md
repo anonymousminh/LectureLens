@@ -1,0 +1,1 @@
+LectureLens is an AI-powered lecture assistant that use LLM to summarize lecture materials (now support plain text and will update to PDF later) and provide chatbot for Q&A about information of lecture itself.
