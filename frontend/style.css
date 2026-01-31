@@ -26,6 +26,7 @@ h1 {
     margin: 0;
     font-size: 1.2em;
     flex-shrink: 0;
+    text-align: center;
 }
 #chat-window {
     flex: 1 1 auto;
@@ -131,6 +132,8 @@ h1 {
     gap: 10px;
     flex-shrink: 0;
     margin-top: auto;
+    border-top: 1px solid #ccc;
+    background-color: white;
 }
 #chat-input {
     flex-grow: 1;
@@ -214,6 +217,15 @@ h1 {
     overflow: hidden; /* Keeps layout clean, children can still scroll */
 }
 
+#chat-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
 #lecture-sidebar {
     width: 250px;
     flex-shrink: 0;
@@ -221,11 +233,12 @@ h1 {
     padding: 15px;
     border-right: 1px solid #ccc;
     overflow-y: auto;
-    height: 83vh;
-    scroll-behavior: smooth;
+    overflow-x: hidden;
+    border-radius: 5px;
+    border: 1px solid black;
 }
 
-/* Custom scrollbar for sidebar */
+/* Custom scrollbar for sidebar
 #lecture-sidebar::-webkit-scrollbar {
     width: 8px;
 }
@@ -247,15 +260,16 @@ h1 {
 #lecture-sidebar {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.1);
-}
+} */
 
 #lecture-upload {
     padding: 10px;
-    flex-shrink: 0;
+    /* flex-shrink: 0; */
     background-color: rgb(138, 132, 132);
     border-bottom: 1px solid #ccc;
     color: white;
     cursor: pointer;
+    border: 1px solid black;    
 }
 
 label{
@@ -275,7 +289,7 @@ label{
 #auth-box{
     width: 50vh;
     height: 50vh;
-    border: 1px solid #ccc;
+    border: 3px solid #ccc;
     border-radius: 5px;
 }
 
