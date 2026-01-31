@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- PDF.js library for PDF text extraction -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script> <!-- For sanitizing HTML -->
 </head>
 <body>
     <!-- Auth App -->
@@ -29,21 +30,22 @@
         <div id="main-content">
             <div id="lecture-sidebar">
                 <input type="file" id="lecture-upload" accept=".txt,.pdf,application/pdf,text/plain">
-                <label for="lecture-upload">Upload Lecture (PDF or TXT)</label>
+                <label for="lecture-upload">Upload Your Lecture Here</label>
             </div>
-            <div id="chat-window">
-                <!-- Initial messages will be added dynamically by script.js -->
-                <button id="scroll-to-bottom" title="Scroll to bottom">↓</button>
+            <div id="chat-container">
+                <div id="chat-window">
+                    <!-- Initial messages will be added dynamically by script.js -->
+                    <button id="scroll-to-bottom" title="Scroll to bottom">↓</button>
+                </div>
+                <div id="input-area">
+                    <input type="text" id="chat-input" placeholder="Ask a question...">
+                    <button id="summarize-button">Summarize</button>
+                    <button id="extract-button">Extract Concepts</button>
+                    <button id="send-button">Send</button>
+                    <button id="clear-button">Clear</button>
+                    <button id="logout-button">Logout</button>
+                </div>
             </div>
-        </div>
-
-        <div id="input-area">
-            <input type="text" id="chat-input" placeholder="Ask a question...">
-            <button id="summarize-button">Summarize</button>
-            <button id="extract-button">Extract Concepts</button>
-            <button id="send-button">Send</button>
-            <button id="clear-button">Clear</button>
-            <button id="logout-button">Logout</button>
         </div>
     </div>
     
