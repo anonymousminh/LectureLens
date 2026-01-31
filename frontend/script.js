@@ -235,7 +235,7 @@ async function handleAuthFormSubmit(event){
 // Show Main App Function
 function showMainApp(){
     authContainer.style.display = 'none';
-    mainApp.style.display = 'block';
+    mainApp.style.display = 'flex';
 
     // Clear auth form
     authEmail.value = '';
@@ -492,7 +492,7 @@ function displayMessage(text, role){
 
     if (role === 'assistant'){
         // Use marked.js to render the text as HTML
-        messageElement.innerHTML = marked.parse(text);
+        messageElement.innerHTML = DOMPurify.sanitize(marked.parse(text));
     } else {
         // Set its text content
         messageElement.textContent = text;
@@ -663,7 +663,7 @@ async function callSummerizeAPI(){
         const summarizeData = await summarizeResponse.json();
         const summary = summarizeData.summary;
 
-        loadingMessage.innerHTML = marked.parse(`Lecture Summary:\n\n ${summary}`);
+        loadingMessage.innerHTML = DOMPurify.sanitize(marked.parse(`Lecture Summary:\n\n ${summary}`));
         loadingMessage.classList.remove('system');
         loadingMessage.classList.add('assistant');
         
@@ -742,7 +742,7 @@ async function callExtractAPI(){
         const extractData = await extractResponse.json();
         const concepts = extractData.coreConcepts;
 
-        loadingMessage.innerHTML = marked.parse(`Extracted Concepts:\n\n ${concepts}`);
+        loadingMessage.innerHTML = DOMPurify.sanitize(marked.parse(`Extracted Concepts:\n\n ${concepts}`));
         loadingMessage.classList.remove('system');
         loadingMessage.classList.add('assistant');
         
