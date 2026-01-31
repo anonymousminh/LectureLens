@@ -39,6 +39,7 @@ const chatWindow = document.getElementById("chat-window");
 const lectureUploadInput = document.getElementById("lecture-upload");
 const summarizeButton = document.getElementById("summarize-button");
 const extractButton = document.getElementById("extract-button");
+const scrollToBottomBtn = document.getElementById("scroll-to-bottom");
 
 // Handle Auth Toggle Mode
 function toggleAuthMode(mode){
@@ -275,6 +276,25 @@ async function handleFileUpload(){
     // Get the file
     const file = lectureUploadInput.files[0];
 
+    // Validate file type (PDF or text)
+    const isValidType = file.type === 'application/pdf' || 
+                        file.type === 'text/plain' || 
+                        file.name.endsWith('.txt') || 
+                        file.name.endsWith('.pdf');
+    
+    if (!isValidType){
+        displayMessage("Please upload a PDF or TXT file only", 'error');
+        return;
+    }
+
+    // File size check (50MB limit)
+    const maxSizeMB = 50;
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes){
+        displayMessage(`File size exceeds the maximum allowed size of ${maxSizeMB}MB`, 'error');
+        return;
+    }
+
     // Display the loading message
     const uploadMessage = displayMessage(`Uploading and processing "${file.name}"...`, 'system');
 
@@ -283,31 +303,87 @@ async function handleFileUpload(){
     lectureUploadInput.disabled = true;
 
     try {
-        // Use FileReader to read the file content as text
-        const reader = new FileReader();
-
-        // This promise will resolve when the file is read
-        const fileContent = await new Promise((resolve, reject) => {
-            reader.onload = (event) => {
-                resolve(event.target.result); // File content
-            };
-            reader.onerror = (error) => {
-                reject(error); // File reading error
-            };
-            reader.readAsText(file); // Read the file
-        });
+        let fileContent;
+        
+        // Handle PDF files
+        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            uploadMessage.textContent = `Extracting text from PDF "${file.name}"...`;
+            fileContent = await extractTextFromPDF(file);
+            
+            if (!fileContent || fileContent.trim().length === 0) {
+                throw new Error('No text could be extracted from the PDF. The file may be empty, image-only, or corrupted.');
+            }
+            
+            console.log(`Extracted ${fileContent.length} characters from PDF`);
+        } 
+        // Handle text files
+        else {
+            fileContent = await readTextFile(file);
+        }
 
         // Log for verification
         console.log(`Received file: ${file.name}. Content preview: ${fileContent.substring(0, 100)}...`);
 
         // Upload the lecture to the API
+        uploadMessage.textContent = `Uploading "${file.name}" to server...`;
         await uploadLecture(file.name, String(fileContent));
         
-        // // Update the message (uploadLecture function will display its own message)
-        // uploadMessage.remove();
+        // Remove the upload progress message after successful upload
+        uploadMessage.remove();
+        
     } catch (error){
-        displayMessage(`Error reading file: ${error.message}`, 'system');
+        console.error('File upload error:', error);
+        // Remove the upload progress message on error too
+        uploadMessage.remove();
+        displayMessage(`Error: ${error.message}`, 'error');
+    } finally {
         lectureUploadInput.disabled = false;
+        setUIState(true);
+    }
+}
+
+// Helper function to read text files
+async function readTextFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target.result);
+        reader.onerror = (error) => reject(error);
+        reader.readAsText(file);
+    });
+}
+
+// Helper function to extract text from PDF using PDF.js
+async function extractTextFromPDF(file) {
+    try {
+        // Set worker source for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        // Read file as ArrayBuffer
+        const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Load PDF document
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const numPages = pdf.numPages;
+        console.log(`PDF has ${numPages} pages`);
+
+        // Extract text from all pages
+        let fullText = '';
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n\n';
+        }
+
+        return fullText.trim();
+    } catch (error) {
+        console.error('PDF extraction error:', error);
+        throw new Error(`Failed to extract text from PDF: ${error.message}`);
     }
 }
 
@@ -334,6 +410,12 @@ async function uploadLecture(fileName, fileContent){
             return;
         }
 
+        // Check for 413 Content Too Large
+        if (response.status === 413){
+            const errorBody = await response.json();
+            throw new Error(errorBody.message || 'File or content is too large');
+        }
+
         // Check for 429 Rate Limit Exceeded
         if (response.status === 429){
             const errorBody = await response.json();
@@ -347,7 +429,14 @@ async function uploadLecture(fileName, fileContent){
         // Check the HTTP errors
         if (!response.ok){
             const errorMessage = await parseErrorResponse(response);
-            throw new Error(`API Error (${response.status}): ${errorMessage}`);
+            
+            // Provide user-friendly messages for common errors
+            if (response.status === 400) {
+                // Bad request - likely validation error
+                throw new Error(errorMessage);
+            } else {
+                throw new Error(`Upload failed (${response.status}): ${errorMessage}`);
+            }
         }
 
         // Parsing the JSON body and return the lecture ID
@@ -361,11 +450,29 @@ async function uploadLecture(fileName, fileContent){
         currentLectureId = newLectureId;
         localStorage.setItem('LectureLens-currentLectureId', newLectureId);
 
+        // Create detailed success message with statistics
+        let successMessage = `Lecture "${fileName}" uploaded successfully!`;
+        
+        if (data.wordCount) {
+            successMessage += ` (${data.wordCount.toLocaleString()} words, ${data.textLength.toLocaleString()} characters)`;
+        }
+        
+        successMessage += ' You can now ask questions about the lecture.';
+
         setUIState(true);
-        displayMessage(`Lecture "${fileName}" uploaded successfully! You can now ask questions about the lecture.`, 'system');
+        displayMessage(successMessage, 'system');
+        
+        // Log upload details to console for debugging
+        console.log('Upload successful:', {
+            lectureId: newLectureId,
+            fileName: data.fileName,
+            fileType: data.fileType,
+            wordCount: data.wordCount,
+            textLength: data.textLength
+        });
     } catch (error){
-        console.log("Upload Lecture Error:", error);
-        displayMessage(`Error: ${error.message}. Please try again.`, 'system');
+        console.error("Upload Lecture Error:", error);
+        displayMessage(`Error: ${error.message}`, 'error');
     } finally {
         lectureUploadInput.disabled = false;
         setUIState(true);
@@ -375,6 +482,9 @@ async function uploadLecture(fileName, fileContent){
 
 // Message Display Function
 function displayMessage(text, role){
+    // Check if user was at bottom before adding message
+    const wasAtBottom = isAtBottom();
+    
     // Create a new div element
     const messageElement = document.createElement('div');
     // Set its class to include message and the role
@@ -387,12 +497,21 @@ function displayMessage(text, role){
         // Set its text content
         messageElement.textContent = text;
     }
-    // Apend the new div to the chat-window
+    // Append the new div to the chat-window
     chatWindow.appendChild(messageElement);
-    // Implement auto-scrolling
-    chatWindow.scrollTop = chatWindow.scrollHeight;
+    
+    // Only auto-scroll if user was at bottom (don't interrupt reading)
+    if (wasAtBottom) {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
 
     return messageElement;
+}
+
+// Helper function to check if chat window is scrolled to bottom
+function isAtBottom() {
+    const threshold = 100; // pixels from bottom to consider "at bottom"
+    return chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < threshold;
 }
 
 // Handle Send Message
@@ -547,6 +666,9 @@ async function callSummerizeAPI(){
         loadingMessage.innerHTML = marked.parse(`Lecture Summary:\n\n ${summary}`);
         loadingMessage.classList.remove('system');
         loadingMessage.classList.add('assistant');
+        
+        // Scroll to bottom to show the full summary
+        chatWindow.scrollTop = chatWindow.scrollHeight;
     } catch (error){
         console.log("Summarize Error:", error);
         loadingMessage.textContent = `Error generating summary: ${error.message}. Please try again.`;
@@ -623,6 +745,9 @@ async function callExtractAPI(){
         loadingMessage.innerHTML = marked.parse(`Extracted Concepts:\n\n ${concepts}`);
         loadingMessage.classList.remove('system');
         loadingMessage.classList.add('assistant');
+        
+        // Scroll to bottom to show the full content
+        chatWindow.scrollTop = chatWindow.scrollHeight;
     } catch (error){
         console.log("Extract Error:", error);
         loadingMessage.textContent = `Error extracting concepts: ${error.message}. Please try again.`;
@@ -714,5 +839,27 @@ if (clearButton){
 
 // Handle Logout Button Click
 logoutButton.addEventListener('click', logoutUser);
+
+// ----- Scroll to Bottom Functionality -----
+
+// Function to scroll chat window to bottom smoothly
+function scrollToBottom() {
+    chatWindow.scrollTo({
+        top: chatWindow.scrollHeight,
+        behavior: 'smooth'
+    });
+}
+
+// Show/hide scroll to bottom button based on scroll position
+chatWindow.addEventListener('scroll', function() {
+    if (isAtBottom()) {
+        scrollToBottomBtn.classList.remove('show');
+    } else {
+        scrollToBottomBtn.classList.add('show');
+    }
+});
+
+// Scroll to bottom when button is clicked
+scrollToBottomBtn.addEventListener('click', scrollToBottom);
 
 
