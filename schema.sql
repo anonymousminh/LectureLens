@@ -10,6 +10,8 @@ DROP TABLE IF EXISTS user_lectures;
 CREATE TABLE user_lectures (
     user_id TEXT,
     lecture_id TEXT,
+    lecture_name TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, lecture_id)
 );
 
