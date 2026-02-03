@@ -106,7 +106,7 @@ function createRateLimitResponse(status: RateLimitStatus): Response {
 function addCorsHeaders(response: Response): Response {
   const newHeaders = new Headers(response.headers);
   newHeaders.set('Access-Control-Allow-Origin', '*');
-  newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   return new Response(response.body, {
@@ -424,8 +424,10 @@ export default {
           return addCorsHeaders(new Response(`Failed to store lecture in memory: ${errorText}`, { status: 500 }));
         }
 
-        // link the lecture to the user
-        await env.lecturelens_db.prepare('INSERT INTO user_lectures (user_id, lecture_id) VALUES (?, ?)').bind(userId, lectureId).run();
+        // link the lecture to the user with metadata
+        await env.lecturelens_db.prepare(
+          'INSERT INTO user_lectures (user_id, lecture_id, lecture_name, created_at) VALUES (?, ?, ?, ?)'
+        ).bind(userId, lectureId, fileName, new Date().toISOString()).run();
 
         // Return success with detailed metadata
         return addCorsHeaders(new Response(JSON.stringify({
@@ -735,13 +737,69 @@ export default {
 
       // --- MAIN LOGIC ---
       try {
-        // Query the database for the lectures owned by this user
-        const {results} = await env.lecturelens_db.prepare('SELECT lecture_id FROM user_lectures WHERE user_id = ?').bind(userId).all();
+        // Query the database for the lectures owned by this user with full metadata
+        const {results} = await env.lecturelens_db.prepare(
+          'SELECT lecture_id, lecture_name, created_at FROM user_lectures WHERE user_id = ? ORDER BY created_at DESC'
+        ).bind(userId).all();
 
-        // Return the lectures
+        // Return the lectures with metadata
         return addCorsHeaders(new Response(JSON.stringify({ lectures: results }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       } catch (error) {
         console.error('Get my lectures error:', error);
+        return addCorsHeaders(new Response(JSON.stringify({ error: 'Internal Server Error' }), { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+    }
+
+    // DELETE LECTURE ENDPOINT
+    if (path.startsWith('/api/lectures/') && request.method === 'DELETE') {
+      // --- VALIDATE SESSION ---
+      const userId = await validateSession(request, env.lecturelens_db);
+      if (!userId){
+        return addCorsHeaders(new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+
+      // Extract lecture ID from path
+      const lectureId = path.split('/').pop();
+      if (!lectureId) {
+        return addCorsHeaders(new Response(JSON.stringify({ error: 'Missing lecture ID' }), { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+
+      // --- AUTHORIZATION (Ownership Check) ---
+      const ownership = await env.lecturelens_db.prepare(
+        'SELECT user_id FROM user_lectures WHERE user_id = ? AND lecture_id = ?'
+      ).bind(userId, lectureId).first();
+      
+      if (!ownership){
+        return addCorsHeaders(new Response(JSON.stringify({ error: 'Forbidden: You do not have access to this lecture.' }), { 
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+
+      try {
+        // Delete the lecture from user_lectures
+        await env.lecturelens_db.prepare(
+          'DELETE FROM user_lectures WHERE user_id = ? AND lecture_id = ?'
+        ).bind(userId, lectureId).run();
+
+        return addCorsHeaders(new Response(JSON.stringify({ 
+          message: 'Lecture deleted successfully',
+          lectureId: lectureId
+        }), { 
+          status: 200, 
+          headers: { 'Content-Type': 'application/json' } 
+        }));
+      } catch (error) {
+        console.error('Delete lecture error:', error);
         return addCorsHeaders(new Response(JSON.stringify({ error: 'Internal Server Error' }), { 
           status: 500,
           headers: { 'Content-Type': 'application/json' }
@@ -780,7 +838,7 @@ export default {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       });
