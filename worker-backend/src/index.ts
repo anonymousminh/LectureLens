@@ -624,7 +624,7 @@ export default {
 
         try {
         // Insert the user into the database
-        await env.lecturelens_db.prepare('INSERT INTO users (id, email, password_hash, salt) VALUES (?, ?, ?, ?)').bind(crypto.randomUUID(), email, hash, salt).run();
+        await env.lecturelens_db.prepare('INSERT INTO users (id, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), email, hash, salt, new Date().toISOString()).run();
 
         return addCorsHeaders(new Response(JSON.stringify({ message: 'User created successfully' }), {
           headers: { 'Content-Type': 'application/json' },
@@ -827,6 +827,51 @@ export default {
       } catch (error) {
         console.error('Logout error:', error);
         return addCorsHeaders(new Response(JSON.stringify({ error: 'Internal Server Error' }), { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+    }
+
+    // STATS ENDPOINT - Track signups and usage
+    // This endpoint returns aggregate statistics about the app
+    if (path === '/api/stats' && request.method === 'GET') {
+      try {
+        // Get total user count
+        const userCountResult = await env.lecturelens_db.prepare(
+          'SELECT COUNT(*) as count FROM users'
+        ).first();
+        
+        // Get total lecture count
+        const lectureCountResult = await env.lecturelens_db.prepare(
+          'SELECT COUNT(*) as count FROM user_lectures'
+        ).first();
+        
+        // Get signups in the last 24 hours
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const recentSignupsResult = await env.lecturelens_db.prepare(
+          'SELECT COUNT(*) as count FROM users WHERE created_at > ?'
+        ).bind(oneDayAgo).first();
+        
+        // Get signups in the last 7 days
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const weeklySignupsResult = await env.lecturelens_db.prepare(
+          'SELECT COUNT(*) as count FROM users WHERE created_at > ?'
+        ).bind(sevenDaysAgo).first();
+
+        return addCorsHeaders(new Response(JSON.stringify({
+          totalUsers: userCountResult?.count || 0,
+          totalLectures: lectureCountResult?.count || 0,
+          signupsLast24Hours: recentSignupsResult?.count || 0,
+          signupsLast7Days: weeklySignupsResult?.count || 0,
+          timestamp: new Date().toISOString()
+        }), { 
+          status: 200, 
+          headers: { 'Content-Type': 'application/json' } 
+        }));
+      } catch (error) {
+        console.error('Stats error:', error);
+        return addCorsHeaders(new Response(JSON.stringify({ error: 'Failed to fetch stats' }), { 
           status: 500,
           headers: { 'Content-Type': 'application/json' }
         }));
