@@ -3,7 +3,8 @@ CREATE TABLE users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE,
     password_hash TEXT,
-    salt TEXT
+    salt TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 DROP TABLE IF EXISTS user_lectures;
